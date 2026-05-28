@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+.vite
+*.log
+
+# Git & IDE
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Backend (not needed in frontend image)
+backend/
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+README.md
+*.md
+setup.sh
+Makefile
