@@ -60,7 +60,7 @@ services:
     container_name: automind-frontend
     ports: ["3000:3000"]
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      VITE_API_URL: https://automindai.info/api
     depends_on:
       backend: { condition: service_started }
     restart: unless-stopped
