@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.models import User
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
@@ -11,12 +13,10 @@ AGENTS = [
     {"kind": "adops", "name": "Ad Optimization Agent"},
 ]
 
-
 @router.get("")
-async def list_agents():
+async def list_agents(current_user: User = Depends(get_current_user)):
     return AGENTS
 
-
 @router.post("/{kind}/run")
-async def run_agent(kind: str, payload: dict | None = None):
-    return {"agent": kind, "status": "dispatched", "task_id": "demo-task"}
+async def run_agent(kind: str, payload: dict | None = None, current_user: User = Depends(get_current_user)):
+    return {"agent": kind, "status": "dispatched", "task_id": "demo-task", "user_id": current_user.id}

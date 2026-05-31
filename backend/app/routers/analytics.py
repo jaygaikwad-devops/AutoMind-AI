@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.models import User
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
-
 @router.get("/overview")
-async def overview():
+async def overview(current_user: User = Depends(get_current_user)):
     return {
         "posts_today": 1284,
         "leads_24h": 932,

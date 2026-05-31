@@ -7,9 +7,13 @@ from app.core.config import settings
 from app.routers import auth, videos, social, agents, workflows, analytics, ws
 
 
+from app.db import engine
+from app.models import Base
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: init DB pools, Redis, etc.
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
     # Shutdown
 

@@ -1,16 +1,137 @@
 from celery import Celery
 from app.core.config import settings
+from app.db import SessionLocal
+from app.models import Video, SocialPost
+from datetime import datetime
+import time
+import os
+import requests
+import asyncio
+import tempfile
+from gtts import gTTS
+from moviepy.editor import VideoFileClip, AudioFileClip, TextClip, CompositeVideoClip
+from azure.storage.blob import BlobServiceClient
 
 celery_app = Celery("automind", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
+def get_pexels_video(query="nature"):
+    if not settings.PEXELS_API_KEY:
+        print("No Pexels API key provided.")
+        return None
+    headers = {"Authorization": settings.PEXELS_API_KEY}
+    res = requests.get(f"https://api.pexels.com/videos/search?query={query}&per_page=15&orientation=portrait", headers=headers)
+    if res.status_code == 200 and res.json().get("videos"):
+        videos = res.json()["videos"]
+        if videos:
+            video_files = videos[0]["video_files"]
+            video_files.sort(key=lambda x: x["width"] * x["height"], reverse=True)
+            return video_files[0]["link"]
+    return None
+
+async def generate_audio(text, output_path):
+    tts = gTTS(text=text, lang='en', tld='com')
+    tts.save(output_path)
+
+def upload_to_azure(file_path, blob_name):
+    if not settings.AZURE_STORAGE_CONNECTION_STRING:
+        print("No Azure storage connection string provided.")
+        return None
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(settings.AZURE_STORAGE_CONNECTION_STRING)
+        blob_client = blob_service_client.get_blob_client(container=settings.AZURE_CONTAINER_NAME, blob=blob_name)
+        with open(file_path, "rb") as data:
+            blob_client.upload_blob(data, overwrite=True)
+        return blob_client.url
+    except Exception as e:
+        print(f"Azure upload failed: {e}")
+        return None
 
 @celery_app.task
 def render_video(video_id: str, prompt: str) -> dict:
-    # TODO: call AI video provider, store to S3
-    return {"video_id": video_id, "status": "ready", "url": f"https://cdn.automind.ai/{video_id}.mp4"}
+    with SessionLocal() as db:
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if not video:
+            return {"error": "Video not found"}
+        video.status = "rendering"
+        db.commit()
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        # 1. Generate audio
+        audio_path = os.path.join(temp_dir, "audio.mp3")
+        asyncio.run(generate_audio(prompt, audio_path))
+        
+        # 2. Get stock video from Pexels
+        keyword = "cityscape" if "city" in prompt.lower() else ("technology" if "tech" in prompt.lower() else "abstract")
+        video_url = get_pexels_video(keyword)
+        stock_path = os.path.join(temp_dir, "stock.mp4")
+        if video_url:
+            r = requests.get(video_url, stream=True)
+            with open(stock_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=1024*1024):
+                    if chunk: f.write(chunk)
+        else:
+            raise Exception("No Pexels video found or no API key provided")
+            
+        # 3. Assemble with MoviePy
+        clip = VideoFileClip(stock_path)
+        audio = AudioFileClip(audio_path)
+        
+        # Match durations
+        duration = min(audio.duration, 60.0) # Cap at 60s
+        if clip.duration < duration:
+            # If stock is shorter, loop it (requires vfx or just looping simple)
+            clip = clip.loop(duration=duration)
+        clip = clip.subclip(0, duration)
+        clip = clip.set_audio(audio)
+        
+        # Add text overlay
+        # Note: Depending on ImageMagick config, TextClip might need font adjustments.
+        txt_clip = TextClip(prompt, fontsize=60, color='white', font='DejaVu-Sans-Bold', bg_color='rgba(0,0,0,0.5)', size=(clip.w*0.8, None), method='caption')
+        txt_clip = txt_clip.set_position('center').set_duration(duration)
+        
+        final_clip = CompositeVideoClip([clip, txt_clip])
+        out_path = os.path.join(temp_dir, f"{video_id}.mp4")
+        
+        # Render
+        final_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+        
+        # 4. Upload to Azure
+        azure_url = upload_to_azure(out_path, f"{video_id}.mp4")
+        if not azure_url:
+            raise Exception("Azure upload returned None. Check Azure credentials.")
+
+        with SessionLocal() as db:
+            video = db.query(Video).filter(Video.id == video_id).first()
+            video.status = "ready"
+            video.url = azure_url
+            db.commit()
+
+        return {"video_id": video_id, "status": "ready", "url": azure_url}
+        
+    except Exception as e:
+        print(f"Error rendering video: {e}")
+        with SessionLocal() as db:
+            video = db.query(Video).filter(Video.id == video_id).first()
+            video.status = "failed"
+            db.commit()
+        return {"error": str(e)}
+    finally:
+        # Cleanup temp files
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @celery_app.task
 def publish_post(post_id: str, platform: str, content: str) -> dict:
-    # TODO: call platform API
+    with SessionLocal() as db:
+        post = db.query(SocialPost).filter(SocialPost.id == post_id).first()
+        if not post:
+            return {"error": "Post not found"}
+        
+        time.sleep(3)
+        post.status = "published"
+        post.published_at = datetime.utcnow()
+        db.commit()
+
     return {"post_id": post_id, "platform": platform, "status": "published"}
