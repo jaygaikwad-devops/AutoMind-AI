@@ -18,7 +18,7 @@ export function Nav() {
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[var(--neon-violet)] to-[var(--neon-cyan)] text-background">
             <Brain className="h-4 w-4" strokeWidth={2.5} />
           </span>
-          <span>AutoMind<span className="text-neon">.ai</span></span>
+          <span>AutoMindai<span className="text-neon">.info</span></span>
         </a>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
           <a href="#features" className="hover:text-foreground transition">Features</a>
@@ -110,7 +110,7 @@ function HeroMockup() {
               <span className="h-2.5 w-2.5 rounded-full bg-red-500/60" />
               <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/60" />
               <span className="h-2.5 w-2.5 rounded-full bg-green-500/60" />
-              <span className="ml-3 text-xs text-muted-foreground">automind.ai / studio</span>
+              <span className="ml-3 text-xs text-muted-foreground">automindai.info / studio</span>
             </div>
             <div className="hidden gap-2 sm:flex">
               <span className="rounded-md bg-white/5 px-2 py-1 text-[10px] text-muted-foreground">⌘K</span>
@@ -689,7 +689,7 @@ export function Footer() {
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-[var(--neon-violet)] to-[var(--neon-cyan)] text-background">
                 <Brain className="h-4 w-4" strokeWidth={2.5} />
               </span>
-              AutoMind<span className="text-neon">.ai</span>
+              AutoMindai<span className="text-neon">.info</span>
             </a>
             <p className="mt-4 max-w-sm text-sm text-muted-foreground">
               The autonomous AI marketing OS. Generate, publish, and optimize — automatically.
