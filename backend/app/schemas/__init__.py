@@ -41,3 +41,19 @@ class WorkflowCreate(BaseModel):
     name: str
     nodes: list[dict] = []
     edges: list[dict] = []
+
+from .campaign import (
+    CampaignCreate,
+    CampaignOut,
+    CampaignFullOut,
+    PersonaOut,
+    CompetitorInsightOut,
+    AngleOut,
+    HookOut,
+    HeadlineOut,
+    CTAOut,
+    AdCopyOut,
+    CreativeConceptOut,
+    VideoScriptOut,
+    CampaignScoreOut
+)

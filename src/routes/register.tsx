@@ -6,7 +6,8 @@ export const Route = createFileRoute('/register')({
   component: RegisterPage,
 });
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocalhost ? 'http://localhost:8000/api' : (import.meta.env.VITE_API_URL || '/api');
 
 function RegisterPage() {
   const [email, setEmail] = useState('');

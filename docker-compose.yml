@@ -58,9 +58,8 @@ services:
       dockerfile: frontend/Dockerfile
       network: host
     container_name: automind-frontend
+    env_file: .env
     ports: ["3000:3000"]
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
     depends_on:
       backend: { condition: service_started }
     restart: unless-stopped

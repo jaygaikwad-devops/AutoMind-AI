@@ -4,8 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, videos, social, agents, workflows, analytics, ws
-
+from app.routers import auth, videos, social, agents, workflows, analytics, ws, campaigns
 
 from app.db import engine
 from app.models import Base
@@ -39,6 +38,7 @@ app.include_router(social.router, prefix="/api/social", tags=["social"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(campaigns.router, prefix="/api/campaigns", tags=["campaigns"])
 app.include_router(ws.router, prefix="/ws", tags=["ws"])
 
 

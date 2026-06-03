@@ -234,3 +234,12 @@ def execute_workflow_task(workflow_id: str) -> dict:
             
     return {"status": "success", "video_id": video_id}
 
+@celery_app.task
+def generate_full_campaign(campaign_id: str):
+    from app.services.campaigns.orchestrator import generate_full_campaign_sync
+    from app.db import SessionLocal
+    
+    with SessionLocal() as db:
+        generate_full_campaign_sync(db, campaign_id)
+        
+    return {"status": "success", "campaign_id": campaign_id}

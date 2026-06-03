@@ -59,3 +59,17 @@ class SocialPost(Base):
     scheduled_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)
     status = Column(String, default="scheduled")
+
+from .campaign import (
+    Campaign,
+    Persona,
+    CompetitorInsight,
+    Angle,
+    Hook,
+    Headline,
+    CTA,
+    AdCopy,
+    CreativeConcept,
+    VideoScript,
+    CampaignScore,
+)

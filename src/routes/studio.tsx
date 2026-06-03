@@ -23,7 +23,8 @@ export const Route = createFileRoute('/studio')({
   component: StudioDashboard,
 });
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocalhost ? 'http://localhost:8000/api' : (import.meta.env.VITE_API_URL || '/api');
 
 const initialNodes: Node[] = [
   { id: '1', type: 'prompt', position: { x: 100, y: 100 }, data: { prompt: '' } },
@@ -38,7 +39,7 @@ function StudioDashboard() {
   const queryClient = useQueryClient();
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
-  const [workflowName, setWorkflowName] = useState('My Video Workflow');
+  const [workflowName, setWorkflowName] = useState('Untitled Workflow');
   const [showDropdown, setShowDropdown] = useState(false);
 
   // Auth check
@@ -173,6 +174,10 @@ function StudioDashboard() {
           <nav className="flex items-center gap-4 text-sm font-medium mr-4">
             <Link to="/studio" className="text-white border-b-2 border-[var(--neon-violet)] pb-1">Studio</Link>
             <Link to="/workflows" className="text-muted-foreground hover:text-white transition">Workflows</Link>
+            <Link to="/campaign-builder" className="text-muted-foreground hover:text-[var(--neon-cyan)] transition flex items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--neon-cyan)] mr-2 animate-pulse" />
+              AI Campaign
+            </Link>
           </nav>
           
           <div className="flex items-center group relative cursor-pointer" onClick={() => setShowDropdown(!showDropdown)}>
