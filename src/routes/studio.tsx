@@ -1,7 +1,23 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Video, Plus, Loader2, Play } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { Loader2, Play, Save, Workflow as WorkflowIcon, ChevronDown } from 'lucide-react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  applyNodeChanges,
+  applyEdgeChanges,
+  addEdge,
+  Node,
+  Edge,
+  NodeChange,
+  EdgeChange,
+  Connection,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+import { PromptNode, VideoNode, SocialNode, CaptionNode, HashtagNode } from '../components/studio/CustomNodes';
 
 export const Route = createFileRoute('/studio')({
   component: StudioDashboard,
@@ -9,17 +25,21 @@ export const Route = createFileRoute('/studio')({
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-type VideoType = {
-  id: string;
-  prompt: string;
-  status: string;
-  url: string | null;
-  created_at: string;
-};
+const initialNodes: Node[] = [
+  { id: '1', type: 'prompt', position: { x: 100, y: 100 }, data: { prompt: '' } },
+  { id: '2', type: 'video', position: { x: 500, y: 100 }, data: {} },
+];
+
+const initialEdges: Edge[] = [
+  { id: 'e1-2', source: '1', target: '2', animated: true, style: { stroke: 'var(--neon-violet)' } },
+];
 
 function StudioDashboard() {
   const queryClient = useQueryClient();
-  const [prompt, setPrompt] = useState('');
+  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [workflowName, setWorkflowName] = useState('My Video Workflow');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Auth check
   const { data: user, error: authError } = useQuery({
@@ -32,153 +52,234 @@ function StudioDashboard() {
     retry: false,
   });
 
-  // Redirect if not authenticated
   if (authError) {
     window.location.href = '/login';
   }
 
-  // Fetch videos
-  const { data: videos = [], isLoading } = useQuery<VideoType[]>({
-    queryKey: ['videos'],
+  // Fetch workflows
+  const { data: workflows = [] } = useQuery({
+    queryKey: ['workflows'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/videos`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch videos');
+      const res = await fetch(`${API_URL}/workflows`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch workflows');
       return res.json();
     },
-    refetchInterval: 2000,
     enabled: !!user,
   });
 
-  // Create video mutation
-  const createMutation = useMutation({
-    mutationFn: async (newPrompt: string) => {
-      const res = await fetch(`${API_URL}/videos`, {
+  const loadWorkflow = (wf: any) => {
+    setWorkflowName(wf.name);
+    setNodes(wf.nodes || []);
+    setEdges(wf.edges || []);
+    setShowDropdown(false);
+  };
+
+  const nodeTypes = useMemo(() => ({
+    prompt: PromptNode,
+    video: VideoNode,
+    social: SocialNode,
+    caption: CaptionNode,
+    hashtag: HashtagNode,
+  }), []);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    []
+  );
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    []
+  );
+  const onConnect = useCallback(
+    (connection: Connection) => setEdges((eds) => addEdge({ ...connection, animated: true, style: { stroke: 'var(--neon-violet)' } }, eds)),
+    []
+  );
+
+  const addNode = (type: string) => {
+    const newNode: Node = {
+      id: `${Date.now()}`,
+      type,
+      position: { x: 200, y: 300 },
+      data: type === 'prompt' ? { prompt: '' } : type === 'social' ? { platform: 'instagram' } : type === 'caption' ? { tone: 'engaging' } : type === 'hashtag' ? { niche: '' } : type === 'video' ? { voice: 'rachel', language: 'en' } : {},
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${API_URL}/workflows`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ prompt: newPrompt, duration_s: 15 }),
+        body: JSON.stringify({
+          name: workflowName,
+          nodes: nodes,
+          edges: edges,
+        }),
       });
-      if (!res.ok) throw new Error('Failed to create video');
+      if (!res.ok) throw new Error('Failed to save workflow');
       return res.json();
     },
     onSuccess: () => {
-      setPrompt('');
-      queryClient.invalidateQueries({ queryKey: ['videos'] });
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      alert('Workflow saved!');
+    }
+  });
+
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      // 1. Auto-save workflow before running
+      const saveRes = await fetch(`${API_URL}/workflows`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: workflowName,
+          nodes: nodes,
+          edges: edges,
+        }),
+      });
+      if (!saveRes.ok) throw new Error('Failed to auto-save workflow');
+      const savedWf = await saveRes.json();
+
+      // 2. Run workflow
+      const res = await fetch(`${API_URL}/workflows/${savedWf.id}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to run workflow');
+      return res.json();
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      alert('Workflow saved and started! Check the Workflows tab to see the preview.');
+    },
+    onError: (err: any) => {
+      alert(err.message);
+    }
   });
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-display font-bold">AutoMind Studio</h1>
-            <p className="text-muted-foreground mt-1">Manage your autonomous AI generations.</p>
+    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+      
+      {/* Header */}
+      <header className="h-16 border-b border-white/10 glass px-6 flex items-center justify-between shrink-0 z-10">
+        <div className="flex items-center gap-6">
+          <div className="text-xl font-display font-bold text-[var(--neon-violet)] flex items-center gap-2">
+            <Play className="w-5 h-5 fill-current" />
+            AutoMind
           </div>
-          {user && (
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{user.email}</span>
-              <button
-                onClick={async () => {
-                  await fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
-                  window.location.href = '/login';
-                }}
-                className="text-sm px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition"
-              >
-                Log Out
-              </button>
-            </div>
-          )}
-        </header>
-
-        {/* Generate New */}
-        <div className="glass-strong rounded-2xl p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Video className="w-5 h-5 text-[var(--neon-violet)]" />
-            Generate New Video
-          </h2>
-          <form 
-            className="flex gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (prompt.trim()) createMutation.mutate(prompt);
-            }}
-          >
-            <input
-              type="text"
-              placeholder="e.g. A cinematic shot of a futuristic city..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[var(--neon-cyan)] transition"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              disabled={createMutation.isPending}
+          <nav className="flex items-center gap-4 text-sm font-medium mr-4">
+            <Link to="/studio" className="text-white border-b-2 border-[var(--neon-violet)] pb-1">Studio</Link>
+            <Link to="/workflows" className="text-muted-foreground hover:text-white transition">Workflows</Link>
+          </nav>
+          
+          <div className="flex items-center group relative cursor-pointer" onClick={() => setShowDropdown(!showDropdown)}>
+            <input 
+              value={workflowName}
+              onChange={(e) => setWorkflowName(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-transparent border-none text-lg font-display font-bold focus:outline-none focus:ring-1 focus:ring-white/20 rounded px-2 -ml-2"
             />
-            <button
-              type="submit"
-              disabled={createMutation.isPending || !prompt.trim()}
-              className="bg-gradient-to-r from-[var(--neon-violet)] to-[var(--neon-cyan)] text-background font-semibold px-6 py-2 rounded-xl flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition"
-            >
-              {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Generate
-            </button>
-          </form>
-        </div>
-
-        {/* Video List */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Your Videos</h2>
-          {isLoading ? (
-            <div className="flex justify-center p-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-          ) : videos.length === 0 ? (
-            <div className="glass rounded-2xl p-10 text-center text-muted-foreground">
-              No videos generated yet. Create one above!
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {videos.map(video => (
-                <div key={video.id} className="glass rounded-2xl p-4 flex flex-col">
-                  
-                  {/* Status badge */}
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-xs text-muted-foreground font-mono truncate mr-2" title={video.id}>
-                      {video.id.split('-')[0]}
-                    </span>
-                    <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full ${
-                      video.status === 'ready' ? 'bg-green-500/20 text-green-400' :
-                      video.status === 'rendering' ? 'bg-yellow-500/20 text-yellow-400 animate-pulse' :
-                      'bg-white/10 text-muted-foreground'
-                    }`}>
-                      {video.status}
-                    </span>
-                  </div>
-
-                  <p className="text-sm font-medium mb-4 flex-1 line-clamp-3">"{video.prompt}"</p>
-
-                  {/* Action area */}
-                  <div className="mt-auto">
-                    {video.status === 'ready' && video.url ? (
-                      <a href={video.url} target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 transition rounded-lg py-2 text-xs font-semibold">
-                        <Play className="w-3 h-3" /> View Result
-                      </a>
-                    ) : (
-                      <div className="w-full h-8 bg-white/5 rounded-lg overflow-hidden relative">
-                        {video.status === 'rendering' && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-[var(--neon-violet)] to-[var(--neon-cyan)] opacity-30 animate-pulse" />
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
-                          {video.status === 'rendering' ? 'Processing...' : 'In Queue'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+            <ChevronDown className="w-4 h-4 text-muted-foreground ml-2 opacity-50 group-hover:opacity-100" />
+          </div>
+          
+          {showDropdown && (
+            <div className="absolute top-10 left-8 bg-[#121212] border border-white/10 rounded-xl shadow-2xl p-2 w-64 z-50">
+              <div className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1">Your Workflows</div>
+              {workflows.map((wf: any) => (
+                <button
+                  key={wf.id}
+                  onClick={() => loadWorkflow(wf)}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 text-sm transition"
+                >
+                  {wf.name}
+                </button>
               ))}
+              {workflows.length === 0 && (
+                <div className="px-3 py-2 text-xs text-muted-foreground">No saved workflows</div>
+              )}
             </div>
           )}
         </div>
+        
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => addNode('prompt')}
+            className="text-sm px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition border border-white/10 text-white/80"
+          >
+            + Text Input
+          </button>
+          <button 
+            onClick={() => addNode('caption')}
+            className="text-sm px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition border border-white/10 text-white/80"
+          >
+            + Smart Captions
+          </button>
+          <button 
+            onClick={() => addNode('hashtag')}
+            className="text-sm px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition border border-white/10 text-white/80"
+          >
+            + Hashtags
+          </button>
+          <button 
+            onClick={() => addNode('video')}
+            className="text-sm px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition border border-white/10 text-white/80"
+          >
+            + AI Video
+          </button>
+          <button 
+            onClick={() => addNode('social')}
+            className="text-sm px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition border border-white/10 text-white/80"
+          >
+            + Social Publish
+          </button>
 
-      </div>
+          <div className="w-px h-6 bg-white/20 mx-2" />
+
+          <button 
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="text-sm px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition flex items-center gap-2"
+          >
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save
+          </button>
+          <button 
+            onClick={() => runMutation.mutate()}
+            disabled={runMutation.isPending}
+            className="text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-[var(--neon-violet)] to-[var(--neon-cyan)] text-background font-semibold flex items-center gap-2 hover:opacity-90 transition disabled:opacity-50"
+          >
+            {runMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Run
+          </button>
+          
+          {user && (
+            <div className="ml-4 pl-4 border-l border-white/10">
+              <span className="text-xs text-muted-foreground">{user.email}</span>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* React Flow Canvas */}
+      <main className="flex-1 w-full h-full relative" style={{ background: '#0a0a0a' }} onClick={() => setShowDropdown(false)}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          fitView
+          className="dark"
+        >
+          <Background color="#ffffff" gap={20} size={1} opacity={0.05} />
+          <Controls className="bg-black/50 border-white/10 fill-white" />
+        </ReactFlow>
+      </main>
+
     </div>
   );
 }
+

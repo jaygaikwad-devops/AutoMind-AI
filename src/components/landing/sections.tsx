@@ -348,7 +348,7 @@ export function SocialAutomation() {
 // ---------------- FEATURES ----------------
 export function Features() {
   const items = [
-    { i: Video, t: "AI Video Generation", d: "Text-to-video reels in 4K." },
+    { i: Video, t: "AI Video Generation", d: "Text-to-video reels in 4K.", href: "/studio" },
     { i: Flame, t: "AI Reel Generator", d: "Trend-aware short-form." },
     { i: ImageIcon, t: "AI Ad Creative", d: "On-brand creatives, A/B tested." },
     { i: Send, t: "Autonomous Posting", d: "Cross-platform schedules." },
@@ -370,9 +370,10 @@ export function Features() {
       <div className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it, i) => (
           <motion.div key={it.t}
+            onClick={() => { if (it.href) window.location.href = it.href; }}
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-50px" }} transition={{ delay: (i % 6) * 0.05 }}
-            className="group relative overflow-hidden rounded-2xl glass p-5 transition hover:-translate-y-1 hover:bg-white/[0.06]">
+            className={`group relative overflow-hidden rounded-2xl glass p-5 transition hover:-translate-y-1 hover:bg-white/[0.06] ${it.href ? 'cursor-pointer' : ''}`}>
             <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-0 transition group-hover:opacity-100"
                  style={{ background: "radial-gradient(circle, oklch(0.72 0.25 295 / 0.4), transparent 60%)", filter: "blur(20px)" }} />
             <span className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--neon-violet)]/30 to-[var(--neon-cyan)]/30">

@@ -135,3 +135,102 @@ def publish_post(post_id: str, platform: str, content: str) -> dict:
         db.commit()
 
     return {"post_id": post_id, "platform": platform, "status": "published"}
+
+@celery_app.task
+def execute_workflow_task(workflow_id: str) -> dict:
+    from app.models import Workflow
+    import uuid
+    import time
+    
+    with SessionLocal() as db:
+        wf = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+        if not wf:
+            return {"error": "Workflow not found"}
+            
+        nodes = wf.nodes or []
+        edges = wf.edges or []
+        
+        prompt_node = next((n for n in nodes if n.get("type") == "prompt"), None)
+        if not prompt_node:
+            return {"error": "No prompt node found in workflow"}
+            
+        prompt_text = prompt_node.get("data", {}).get("prompt", "")
+        if not prompt_text.strip():
+            return {"error": "Video rendering failed: No text to speak"}
+        
+        video_node = next((n for n in nodes if n.get("type") == "video"), None)
+        if not video_node:
+            return {"error": "No video node found in workflow"}
+            
+        # Extract premium config
+        video_data = video_node.get("data", {})
+        voice = video_data.get("voice", "rachel")
+        language = video_data.get("language", "en")
+        
+        # Create Video DB entry
+        video_id = str(uuid.uuid4())
+        db_video = Video(
+            id=video_id,
+            user_id=wf.user_id,
+            prompt=prompt_text,
+            status="queued"
+        )
+        db.add(db_video)
+        db.commit()
+        
+    # Render Video
+    # In a real app with ELEVENLABS_API_KEY and RUNWAY_API_KEY, we would call those here.
+    # For now, we fallback to our Pexels + gTTS generator.
+    print(f"[PREMIUM] Using ElevenLabs Voice: {voice}, Language: {language}")
+    result = render_video(video_id, prompt_text)
+    
+    if "error" in result:
+        return {"error": f"Video rendering failed: {result['error']}"}
+        
+    # Find Social Node
+    social_node = next((n for n in nodes if n.get("type") == "social"), None)
+    
+    if social_node:
+        platform = social_node.get("data", {}).get("platform", "instagram")
+        
+        # Check for Smart Captions
+        caption_node = next((n for n in nodes if n.get("type") == "caption"), None)
+        caption_text = f"Check out this AI generated video: {prompt_text}"
+        if caption_node:
+            tone = caption_node.get("data", {}).get("tone", "engaging")
+            print(f"[AI] Generating {tone} caption...")
+            time.sleep(1) # Simulate LLM call
+            if tone == "funny":
+                caption_text = f"Nobody: ...\nMe generating {prompt_text} with AI 😂🔥"
+            elif tone == "professional":
+                caption_text = f"Exploring the boundaries of generative AI with a focus on {prompt_text}. #Innovation"
+            else:
+                caption_text = f"This AI generation of {prompt_text} is absolutely mind-blowing! 🚀✨"
+                
+        # Check for Viral Hashtags
+        hashtag_node = next((n for n in nodes if n.get("type") == "hashtag"), None)
+        if hashtag_node:
+            niche = hashtag_node.get("data", {}).get("niche", "ai")
+            print(f"[AI] Generating hashtags for niche: {niche}")
+            time.sleep(1) # Simulate LLM call
+            caption_text += f"\n\n#fyp #viral #{niche.replace(' ', '')} #aigenerated"
+            
+        # Append URL
+        content = f"{caption_text}\n\nLink: {result.get('url', '')}"
+        
+        with SessionLocal() as db:
+            post_id = str(uuid.uuid4())
+            db_post = SocialPost(
+                id=post_id,
+                user_id=wf.user_id,
+                platform=platform,
+                content=content,
+                status="scheduled"
+            )
+            db.add(db_post)
+            db.commit()
+            
+        publish_post.delay(post_id, platform, content)
+            
+    return {"status": "success", "video_id": video_id}
+

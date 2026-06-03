@@ -33,6 +33,12 @@ async def publish(body: SocialPostCreate, current_user: User = Depends(get_curre
 
     return {"ok": True, "platform": body.platform, "queued_at": body.scheduled_at, "id": db_post.id}
 
+@router.get("")
+async def list_posts(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SocialPost).filter(SocialPost.user_id == current_user.id).order_by(SocialPost.created_at.desc()))
+    posts = result.scalars().all()
+    return posts
+
 @router.get("/platforms")
 async def platforms(current_user: User = Depends(get_current_user)):
     return ["instagram", "facebook", "linkedin", "tiktok", "youtube", "meta_ads"]
