@@ -7,7 +7,7 @@ export const Route = createFileRoute('/workflows')({
   component: WorkflowsDashboard,
 });
 
-const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_URL = isLocalhost ? 'http://localhost:8000/api' : (import.meta.env.VITE_API_URL || '/api');
 
 function WorkflowsDashboard() {

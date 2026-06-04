@@ -6,7 +6,7 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 });
 
-const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_URL = isLocalhost ? 'http://localhost:8000/api' : (import.meta.env.VITE_API_URL || '/api');
 
 function LoginPage() {
@@ -33,8 +33,8 @@ function LoginPage() {
         throw new Error(data.detail || 'Failed to login');
       }
 
-      // Redirect to studio on success
-      window.location.href = '/studio';
+      // Redirect to campaign manager on success
+      window.location.href = '/agents/campaign-manager';
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -7,7 +7,7 @@ export const Route = createFileRoute('/campaigns')({
 });
 
 function CampaignsComponent() {
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_URL = isLocalhost ? 'http://localhost:8000/api' : (import.meta.env.VITE_API_URL || '/api');
 
   const { data: campaigns, isLoading } = useQuery({

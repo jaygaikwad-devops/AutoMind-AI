@@ -16,6 +16,8 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     plan = Column(String, default="starter")
+    credits = Column(Integer, default=500)
+    rate_limit_reset = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

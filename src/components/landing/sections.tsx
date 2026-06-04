@@ -28,8 +28,8 @@ export function Nav() {
           <a href="#docs" className="hover:text-foreground transition">Docs</a>
         </nav>
         <div className="flex items-center gap-2">
-          <a href="#" className="hidden text-sm text-muted-foreground hover:text-foreground sm:block">Sign in</a>
-          <a href="#" className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90">
+          <a href="/login" className="hidden text-sm text-muted-foreground hover:text-foreground sm:block">Sign in</a>
+          <a href="/agents" className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90">
             Start free <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
           </a>
         </div>
@@ -77,7 +77,7 @@ export function Hero() {
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.4 }}
           className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <a href="#" className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-[var(--neon-violet)] via-[var(--neon-pink)] to-[var(--neon-cyan)] px-6 py-3 text-sm font-semibold text-background shadow-[0_0_40px_-5px_oklch(0.72_0.25_295_/_0.6)] transition hover:scale-[1.02]">
+          <a href="/agents" className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-[var(--neon-violet)] via-[var(--neon-pink)] to-[var(--neon-cyan)] px-6 py-3 text-sm font-semibold text-background shadow-[0_0_40px_-5px_oklch(0.72_0.25_295_/_0.6)] transition hover:scale-[1.02]">
             <Sparkles className="h-4 w-4" /> Start Building
             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </a>
@@ -458,6 +458,11 @@ export function AgentNetwork() {
               <CircleDot className="h-4 w-4 text-[var(--neon-lime)]" />
             </div>
           ))}
+          <div className="pt-4">
+            <a href="/agents" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-medium transition hover:bg-white/20">
+              Access the Agent Hub <ArrowRight className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </div>
     </SectionWrap>
@@ -544,9 +549,9 @@ export function Infrastructure() {
 // ---------------- PRICING ----------------
 export function Pricing() {
   const tiers = [
-    { name: "Starter", price: 49, tag: "For solo founders", feats: ["100 AI videos / mo", "3 social accounts", "Basic agents", "Email support"], featured: false },
-    { name: "Growth", price: 149, tag: "Most popular", feats: ["Unlimited AI videos", "15 social accounts", "All 6 agents", "Workflow builder", "Priority support"], featured: true },
-    { name: "Agency", price: 499, tag: "For teams & studios", feats: ["Everything in Growth", "Unlimited accounts", "White-label", "Custom agents + API", "Dedicated CSM"], featured: false },
+    { name: "Starter", price: "60", tag: "For solo founders", feats: ["500 Marketing Credits", "10 Standard Videos", "100 AI Generations", "10 Ad Campaigns"], featured: false },
+    { name: "Growth", price: "120", tag: "Most popular", feats: ["2,000 Marketing Credits", "40 Standard Videos", "500 AI Generations", "50 Ad Campaigns"], featured: true },
+    { name: "Agency", price: "180", tag: "For teams & studios", feats: ["5,000 Marketing Credits", "100 Standard Videos", "Multi-client Workspaces", "White-label Options"], featured: false },
   ];
   return (
     <SectionWrap id="pricing" eyebrow="Pricing" title={<>Simple plans. <span className="text-gradient">Insane value.</span></>}
@@ -563,7 +568,7 @@ export function Pricing() {
               <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t.name}</div>
               <div className="mt-1 text-xs text-muted-foreground">{t.tag}</div>
               <div className="mt-4 flex items-baseline gap-1">
-                <span className="font-display text-5xl font-bold">${t.price}</span>
+                <span className="font-display text-5xl font-bold">{t.price} USDT</span>
                 <span className="text-sm text-muted-foreground">/mo</span>
               </div>
               <ul className="mt-6 space-y-2.5 text-sm">
