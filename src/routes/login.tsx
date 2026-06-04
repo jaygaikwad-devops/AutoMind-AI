@@ -29,8 +29,15 @@ function LoginPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || 'Failed to login');
+        let errorMsg = 'Failed to login';
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          errorMsg = data.detail || errorMsg;
+        } else {
+          errorMsg = `Server error: ${res.status} ${res.statusText}`;
+        }
+        throw new Error(errorMsg);
       }
 
       // Redirect to campaign manager on success
