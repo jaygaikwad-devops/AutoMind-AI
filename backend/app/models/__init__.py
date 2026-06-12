@@ -75,3 +75,10 @@ from .campaign import (
     VideoScript,
     CampaignScore,
 )
+
+from .billing import (
+    Subscription,
+    Payment,
+    BillingEvent,
+    ProcessedWebhook,
+)
