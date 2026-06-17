@@ -235,11 +235,130 @@ def execute_workflow_task(workflow_id: str) -> dict:
     return {"status": "success", "video_id": video_id}
 
 @celery_app.task
-def generate_full_campaign(campaign_id: str):
+def generate_full_campaign(campaign_id: str, job_id: str = None):
     from app.services.campaigns.orchestrator import generate_full_campaign_sync
     from app.db import SessionLocal
+    from app.models.campaign import CampaignJob
+    from app.services.billing.credit_service import CreditService
+    from datetime import datetime
     
     with SessionLocal() as db:
-        generate_full_campaign_sync(db, campaign_id)
-        
+        user_id = None
+        amount = 0
+        if job_id:
+            job = db.query(CampaignJob).filter(CampaignJob.id == job_id).first()
+            if job:
+                job.status = "running"
+                job.started_at = datetime.utcnow()
+                user_id = job.user_id
+                amount = job.credits_reserved or 0
+                db.commit()
+                
+        try:
+            generate_full_campaign_sync(db, campaign_id)
+            
+            if job_id:
+                job = db.query(CampaignJob).filter(CampaignJob.id == job_id).first()
+                if job:
+                    job.status = "completed"
+                    job.completed_at = datetime.utcnow()
+                    db.commit()
+                    
+            if user_id and amount > 0:
+                CreditService.commit_credits_sync(db, user_id, amount)
+                
+            if user_id:
+                from app.models.activity import ActivityEvent
+                event = ActivityEvent(
+                    user_id=user_id,
+                    event="campaign_generated",
+                    agent="campaign_manager",
+                    credits_used=amount,
+                    job_id=job_id,
+                    campaign_id=campaign_id
+                )
+                db.add(event)
+                db.commit()
+                    
+        except Exception as e:
+            if job_id:
+                job = db.query(CampaignJob).filter(CampaignJob.id == job_id).first()
+                if job:
+                    job.status = "failed"
+                    job.completed_at = datetime.utcnow()
+                    job.error_message = str(e)
+                    db.commit()
+                    
+            if user_id and amount > 0:
+                CreditService.refund_credits_sync(db, user_id, amount)
+                
+            raise e
+            
     return {"status": "success", "campaign_id": campaign_id}
+
+@celery_app.task
+def execute_agent_task(kind: str, job_id: str, payload: dict | None = None):
+    from app.db import SessionLocal
+    from app.models.campaign import CampaignJob
+    from app.services.billing.credit_service import CreditService
+    from app.models.activity import ActivityEvent
+    from datetime import datetime
+    import time
+    
+    with SessionLocal() as db:
+        user_id = None
+        amount = 0
+        job = db.query(CampaignJob).filter(CampaignJob.id == job_id).first()
+        if job:
+            job.status = "running"
+            job.started_at = datetime.utcnow()
+            user_id = job.user_id
+            amount = job.credits_reserved or 0
+            db.commit()
+            
+        try:
+            # Simulated Execution Logic for Phase 1
+            if kind == "content_strategist":
+                print("[Content Strategist] Generating hooks, headlines, captions...")
+                time.sleep(3) # Simulate LLM
+            elif kind == "creative_studio":
+                print("[Creative Studio] Generating video and image jobs...")
+                time.sleep(4) # Simulate Generation
+            else:
+                # Mocked agents
+                print(f"[{kind}] Executing mocked analytics/distribution...")
+                time.sleep(1)
+            
+            if job:
+                job.status = "completed"
+                job.completed_at = datetime.utcnow()
+                db.commit()
+                
+            if user_id and amount > 0:
+                CreditService.commit_credits_sync(db, user_id, amount)
+                
+            # Create Activity Event
+            if user_id:
+                event = ActivityEvent(
+                    user_id=user_id,
+                    event=f"{kind}_completed",
+                    agent=kind,
+                    credits_used=amount,
+                    job_id=job_id
+                )
+                db.add(event)
+                db.commit()
+                
+        except Exception as e:
+            if job:
+                job.status = "failed"
+                job.completed_at = datetime.utcnow()
+                job.error_message = str(e)
+                db.commit()
+                
+            if user_id and amount > 0:
+                CreditService.refund_credits_sync(db, user_id, amount)
+                
+            raise e
+            
+    return {"status": "success", "agent": kind}

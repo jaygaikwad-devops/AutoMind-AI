@@ -16,6 +16,20 @@ class Campaign(Base):
     status = Column(String, default="analyzing") # analyzing, generating_personas, completed
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class CampaignJob(Base):
+    __tablename__ = "campaign_jobs"
+    id = Column(String, primary_key=True, default=_id)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    campaign_id = Column(String, ForeignKey("campaigns.id", ondelete="CASCADE"), index=True, nullable=True)
+    job_type = Column(String, index=True) # e.g. "campaign_generation", "video_generation"
+    status = Column(String, default="pending", index=True) # pending, running, completed, failed
+    credits_reserved = Column(Integer, default=0)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Persona(Base):
     __tablename__ = "personas"
     id = Column(String, primary_key=True, default=_id)

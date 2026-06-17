@@ -8,10 +8,12 @@ from app.db import get_db
 from app.api.deps import get_current_user
 from app.models.campaign import (
     Campaign, Persona, CompetitorInsight, Angle, Hook, Headline,
-    CTA, AdCopy, CreativeConcept, VideoScript, CampaignScore
+    CTA, AdCopy, CreativeConcept, VideoScript, CampaignScore, CampaignJob
 )
 from app.schemas.campaign import CampaignCreate, CampaignOut, CampaignFullOut
 from app.workers.celery_app import generate_full_campaign
+from app.services.billing.credit_service import CreditService, CreditReservationError
+from app.core.constants import AGENT_COSTS, JOB_STATUS
 
 router = APIRouter()
 
@@ -38,8 +40,28 @@ async def analyze_campaign(
     await db.commit()
     await db.refresh(new_campaign)
 
+    # Try to reserve credits
+    amount = AGENT_COSTS.get("campaign_manager", 50)
+    try:
+        await CreditService.reserve_credits(db, current_user.id, amount, job_id=None)
+    except CreditReservationError as e:
+        raise HTTPException(status_code=402, detail=str(e)) # 402 Payment Required
+
+    # Create CampaignJob to track this task
+    job_id = str(uuid.uuid4())
+    new_job = CampaignJob(
+        id=job_id,
+        user_id=current_user.id,
+        campaign_id=campaign_id,
+        job_type="campaign_manager",
+        status=JOB_STATUS["PENDING"],
+        credits_reserved=amount
+    )
+    db.add(new_job)
+    await db.commit()
+
     # Fire off Celery background task
-    generate_full_campaign.delay(campaign_id)
+    generate_full_campaign.delay(campaign_id, job_id)
 
     return new_campaign
 

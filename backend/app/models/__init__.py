@@ -17,6 +17,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     plan = Column(String, default="starter")
     credits = Column(Integer, default=500)
+    credits_reserved = Column(Integer, default=0)
     rate_limit_reset = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -74,6 +75,7 @@ from .campaign import (
     CreativeConcept,
     VideoScript,
     CampaignScore,
+    CampaignJob,
 )
 
 from .billing import (
@@ -82,3 +84,5 @@ from .billing import (
     BillingEvent,
     ProcessedWebhook,
 )
+
+from .activity import ActivityEvent
