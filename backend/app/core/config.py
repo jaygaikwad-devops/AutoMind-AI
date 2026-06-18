@@ -17,9 +17,6 @@ class Settings(BaseSettings):
     PEXELS_API_KEY: str = ""
     AZURE_STORAGE_CONNECTION_STRING: str = ""
     AZURE_CONTAINER_NAME: str = "automind-videos"
-    JWT_SECRET: str = "your-super-secret-key-change-in-production"
-    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
-    JWT_ALGORITHM: str = "HS256"
 
     # Stripe
     STRIPE_SECRET_KEY: str = ""
@@ -36,5 +33,15 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     AWS_S3_BUCKET: str = "automind-assets-prod"
     AWS_CLOUDFRONT_DOMAIN: str = "cdn.automindai.info"
+
+    # AWS Bedrock — LLM provider
+    LLM_PROVIDER: str = "bedrock"               # openai | bedrock
+    BEDROCK_REGION: str = "us-east-1"
+    BEDROCK_MODEL_ID: str = "anthropic.claude-3-sonnet-20240229-v1:0"
+    BEDROCK_HAIKU_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
+
+    # AWS SES (future)
+    SES_FROM_EMAIL: str = ""
+    SES_REGION: str = "us-east-1"
 
 settings = Settings()

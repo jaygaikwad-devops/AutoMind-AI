@@ -87,3 +87,4 @@ from .billing import (
 
 from .activity import ActivityEvent
 from .asset import Asset
+from .marketing import ResearchSnapshot, BrandProfile, CampaignContent
