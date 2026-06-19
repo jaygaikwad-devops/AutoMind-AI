@@ -1,26 +1,23 @@
-# Dependencies
+# Dependencies (installed fresh in container)
 node_modules
 .pnpm-store
 
-# Build outputs
+# Build outputs (rebuilt in container)
+.output
+.vinxi
 dist
 .vite
-*.log
 
 # Git & IDE
 .git
-.gitignore
 .github
 .vscode
 .idea
 
-# Docker
-docker-compose*.yml
-Dockerfile*
-.dockerignore
-
-# Backend (not needed in frontend image)
+# Backend (not needed in frontend build)
 backend/
+
+# Environment
 .env
 .env.local
 .env.*.local
@@ -29,8 +26,8 @@ backend/
 .DS_Store
 Thumbs.db
 
+# Logs
+*.log
+
 # Misc
-README.md
-*.md
-setup.sh
-Makefile
+.kiro/
