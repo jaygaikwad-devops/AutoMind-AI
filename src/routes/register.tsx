@@ -1,13 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { API_URL } from '../lib/api';
 
 export const Route = createFileRoute('/register')({
   component: RegisterPage,
 });
-
-const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const API_URL = isLocalhost ? 'http://localhost:8000/api' : (import.meta.env.VITE_API_URL || '/api');
 
 function RegisterPage() {
   const [email, setEmail] = useState('');

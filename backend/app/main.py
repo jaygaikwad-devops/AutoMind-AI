@@ -28,8 +28,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cookie"],
+    expose_headers=["Set-Cookie"],
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

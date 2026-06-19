@@ -1,0 +1,110 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AutoMind AI — Nginx Configuration (Production)
+# Domain: automindai.info
+# SSL: Let's Encrypt (certbot)
+#
+# Architecture:
+#   Client → Nginx (443) → Frontend (3000) or Backend (8000)
+#   Cookies work because everything is same-origin (automindai.info)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Redirect www → non-www ────────────────────────────────────────────────────
+server {
+    server_name www.automindai.info;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    ssl_certificate /etc/letsencrypt/live/automindai.info/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/automindai.info/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    return 301 https://automindai.info$request_uri;
+}
+
+# ── Main server block ─────────────────────────────────────────────────────────
+server {
+    server_name automindai.info;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    ssl_certificate /etc/letsencrypt/live/automindai.info/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/automindai.info/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    access_log /var/log/nginx/automindai.access.log;
+    error_log  /var/log/nginx/automindai.error.log;
+
+    client_max_body_size 50M;
+
+    # ── Backend API ───────────────────────────────────────────────────────────
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+
+        # Timeouts for long-running AI generation requests
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
+    }
+
+    # ── WebSocket ─────────────────────────────────────────────────────────────
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8000/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket keepalive
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # ── Swagger / OpenAPI docs ────────────────────────────────────────────────
+    location /docs {
+        proxy_pass http://127.0.0.1:8000/docs;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /openapi.json {
+        proxy_pass http://127.0.0.1:8000/openapi.json;
+        proxy_set_header Host $host;
+    }
+
+    # ── Health check endpoint (bypass frontend) ───────────────────────────────
+    location = /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_set_header Host $host;
+    }
+
+    # ── Frontend (catch-all) ──────────────────────────────────────────────────
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ── HTTP → HTTPS redirect ─────────────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name automindai.info www.automindai.info;
+    return 301 https://automindai.info$request_uri;
+}
