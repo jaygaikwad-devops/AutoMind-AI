@@ -23,7 +23,7 @@ from app.api.deps import get_current_user
 from app.db import get_db
 from app.models import User
 from app.models.marketing import BrandProfile
-from app.services.billing.credit_service import CreditReservationError
+from app.services.billing.credit_service import CreditService, CreditReservationError
 from app.services.agents.runner import AgentRunner
 from app.services.agents.market_research_agent import MarketResearchAgent
 from app.services.agents.persona_agent import PersonaAgent
@@ -613,3 +613,148 @@ async def run_full_content_bundle(
         "seo": results["seo"].get("seo", {}),
         "ctas": results["cta"].get("ctas", {}),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MVP Launch — Video Scripts, Listings, Video Generation
+# ══════════════════════════════════════════════════════════════════════════════
+
+from app.services.agents.video_script_agent import VideoScriptAgent
+from app.services.agents.listing_agent import AmazonListingAgent, FlipkartListingAgent
+from app.services.video.kling_provider import KlingProvider
+
+
+class VideoScriptRequest(PydanticBaseModel):
+    snapshot_id: str | None = None
+    persona_content_id: str | None = None
+    hooks_content_id: str | None = None
+    captions_content_id: str | None = None
+    brand_profile_id: str | None = None
+    research: dict | None = None
+    campaign_id: str | None = None
+    product_name: str | None = None
+
+class ListingRequest(PydanticBaseModel):
+    snapshot_id: str | None = None
+    product_name: str
+    product_description: str | None = None
+    research: dict | None = None
+    campaign_id: str | None = None
+
+class VideoGenerateRequest(PydanticBaseModel):
+    prompt: str
+    duration_seconds: int = 5
+    aspect_ratio: str = "9:16"
+    style: str = "realistic"
+    campaign_id: str | None = None
+
+class VideoStatusRequest(PydanticBaseModel):
+    job_id: str
+
+
+# ── Video Script endpoint ─────────────────────────────────────────────────────
+
+@router.post("/video-scripts", summary="Generate video scripts (UGC, Demo, Reel, Ad)")
+async def run_video_scripts(
+    body: VideoScriptRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = VideoScriptAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Video script generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "video_scripts": result.get("video_scripts", {})}
+
+
+# ── Amazon Listing endpoint ───────────────────────────────────────────────────
+
+@router.post("/listing/amazon", summary="Generate optimized Amazon listing")
+async def run_amazon_listing(
+    body: ListingRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = AmazonListingAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Amazon listing generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "listing": result.get("listing", {}), "marketplace": "amazon"}
+
+
+# ── Flipkart Listing endpoint ─────────────────────────────────────────────────
+
+@router.post("/listing/flipkart", summary="Generate optimized Flipkart listing")
+async def run_flipkart_listing(
+    body: ListingRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = FlipkartListingAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Flipkart listing generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "listing": result.get("listing", {}), "marketplace": "flipkart"}
+
+
+# ── Video Generation (Kling) ──────────────────────────────────────────────────
+
+@router.post("/video/generate", summary="Generate video via Kling AI")
+async def generate_video(
+    body: VideoGenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit a video generation job to Kling. Returns job_id for status polling."""
+    # Reserve 10 credits for video generation
+    try:
+        await CreditService.reserve_credits(db, current_user.id, 10, job_id=None)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+
+    provider = KlingProvider()
+    try:
+        result = await provider.generate_video(
+            prompt=body.prompt,
+            duration_seconds=body.duration_seconds,
+            aspect_ratio=body.aspect_ratio,
+            style=body.style,
+        )
+    except Exception as exc:
+        await CreditService.refund_credits(db, current_user.id, 10)
+        raise HTTPException(status_code=500, detail=f"Video generation failed: {exc}")
+
+    # Emit event
+    event = ActivityEvent(
+        user_id=current_user.id,
+        event="video_generation_started",
+        agent="kling_provider",
+        credits_used=0,
+        campaign_id=body.campaign_id,
+        metadata_json={"job_id": result.get("job_id"), "provider": "kling", "prompt": body.prompt[:100]},
+    )
+    db.add(event)
+    await db.commit()
+
+    return result
+
+
+@router.post("/video/status", summary="Check Kling video generation status")
+async def check_video_status(
+    body: VideoStatusRequest,
+    current_user: User = Depends(get_current_user),
+):
+    provider = KlingProvider()
+    return await provider.check_status(body.job_id)

@@ -16,7 +16,12 @@ AGENT_COSTS = {
     "adcopy": 8,
     "seo": 5,
     "cta": 3,
-    "full_content_bundle": 34,  # 5+5+5+5+3+8+5+3 = 39 (but bundled at 34)
+    "full_content_bundle": 34,
+    # MVP Launch agents
+    "video_script": 8,
+    "amazon_listing": 5,
+    "flipkart_listing": 5,
+    "video_generation": 10,
 }
 
 JOB_STATUS = {

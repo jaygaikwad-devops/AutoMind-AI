@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     BEDROCK_MODEL_ID: str = "anthropic.claude-3-sonnet-20240229-v1:0"
     BEDROCK_HAIKU_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
 
+    # Kling AI — Video generation
+    KLING_API_KEY: str = ""
+    KLING_API_BASE: str = "https://api.klingai.com"
+
     # AWS SES (future)
     SES_FROM_EMAIL: str = ""
     SES_REGION: str = "us-east-1"
