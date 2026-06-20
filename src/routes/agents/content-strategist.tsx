@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { PenTool, MessageSquare, Hash, FileText, Loader2, Wand2 } from 'lucide-react';
+import { API_URL } from '../../lib/api';
 
 export const Route = createFileRoute('/agents/content-strategist')({
   component: ContentStrategist,
@@ -10,15 +11,40 @@ function ContentStrategist() {
   const [topic, setTopic] = useState('');
   const [contentType, setContentType] = useState('caption');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
 
   const handleGenerate = async () => {
     setLoading(true);
-    // Simulate generation for now
-    setTimeout(() => {
+    setError('');
+    setResult(null);
+
+    const endpointMap: Record<string, string> = {
+      caption: '/v1/marketing/captions',
+      hook: '/v1/marketing/hooks',
+      hashtag: '/v1/marketing/hashtags',
+      blog: '/v1/marketing/seo',
+    };
+    const endpoint = endpointMap[contentType] || '/v1/marketing/captions';
+
+    try {
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ product_name: topic, product_description: topic, industry: 'general' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Failed (${res.status})`);
+      }
+      const data = await res.json();
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-      setResult('🔥 Unleash the power of AI in your marketing stack. Stop trading time for money and let autonomous agents scale your reach 24/7. #AutoMind #Marketing #AI');
-    }, 1500);
+    }
   };
 
   return (
@@ -105,9 +131,12 @@ function ContentStrategist() {
               <Loader2 className="w-6 h-6 animate-spin text-[var(--neon-cyan)]" />
               <p className="text-xs animate-pulse">Consulting the Strategist...</p>
             </div>
+          ) : error ? (
+            <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-sm text-red-200">{error}</div>
           ) : result ? (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-              {result}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-sm leading-relaxed text-foreground whitespace-pre-wrap overflow-auto max-h-[400px]">
+              <div className="text-xs text-muted-foreground mb-2">Quality: {result.quality_score}/100 • Credits: {result.credits_committed}</div>
+              {JSON.stringify(result.captions || result.hooks || result.hashtags || result.seo || result, null, 2)}
             </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground/50 text-center p-6">

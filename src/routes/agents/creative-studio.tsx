@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Video, Sparkles, Image as ImageIcon, Play, Loader2 } from 'lucide-react';
+import { API_URL } from '../../lib/api';
 
 export const Route = createFileRoute('/agents/creative-studio')({
   component: CreativeStudio,
@@ -10,14 +11,31 @@ function CreativeStudio() {
   const [prompt, setPrompt] = useState('');
   const [videoType, setVideoType] = useState('standard');
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
 
   const handleGenerate = async () => {
     setLoading(true);
-    // Simulate generation for now
-    setTimeout(() => {
+    setError('');
+    setResult(null);
+
+    try {
+      const res = await fetch(`${API_URL}/v1/marketing/video-scripts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ product_name: prompt, research: { company_summary: prompt } }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Failed (${res.status})`);
+      }
+      setResult(await res.json());
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-      alert('Video generation started!');
-    }, 2000);
+    }
   };
 
   return (

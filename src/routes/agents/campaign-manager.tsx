@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { BrainCircuit, Globe, ArrowRight, Loader2, Play } from 'lucide-react';
+import { API_URL } from '../../lib/api';
 
 export const Route = createFileRoute('/agents/campaign-manager')({
   component: CampaignManager,
@@ -9,13 +10,31 @@ export const Route = createFileRoute('/agents/campaign-manager')({
 function CampaignManager() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
 
-  const handleLaunch = () => {
+  const handleLaunch = async () => {
     setLoading(true);
-    setTimeout(() => {
+    setError('');
+    setResult(null);
+
+    try {
+      const res = await fetch(`${API_URL}/v1/marketing/full-content-bundle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ website_url: url, product_name: url, industry: 'general' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Failed (${res.status})`);
+      }
+      setResult(await res.json());
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-      alert('Campaign dispatched to Agent Network!');
-    }, 2000);
+    }
   };
 
   return (
@@ -90,6 +109,27 @@ function CampaignManager() {
               )}
             </span>
           </button>
+
+          {error && (
+            <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-sm text-red-200">{error}</div>
+          )}
+
+          {result && (
+            <div className="mt-6 glass p-6 rounded-2xl space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-white">Campaign Generated ✓</h3>
+                <span className="text-sm text-muted-foreground">{result.total_credits_committed} credits used</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {result.agents_completed?.map((agent: string) => (
+                  <div key={agent} className="bg-white/5 rounded-lg p-3 text-center">
+                    <div className="text-xs text-muted-foreground uppercase">{agent}</div>
+                    <div className="text-sm font-bold text-[var(--neon-lime)]">{result.quality_scores?.[agent] || '—'}/100</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
         </div>
       </div>

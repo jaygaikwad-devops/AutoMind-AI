@@ -34,6 +34,7 @@ from app.core.constants import JOB_STATUS
 from app.models import User
 from app.models.campaign import CampaignJob
 from app.models.activity import ActivityEvent
+from app.models.cost_tracking import UsageLog
 from app.services.billing.credit_service import CreditService, CreditReservationError
 from .base import BaseAgent
 
@@ -106,6 +107,24 @@ class AgentRunner:
             await CreditService.commit_credits(self.db, self.user_id, actual_cost)
             job.status = JOB_STATUS["COMPLETED"]
             job.completed_at = datetime.utcnow()
+
+            # ── Step 9: Write UsageLog for cost tracking ──────────────
+            duration_ms = int((job.completed_at - job.started_at).total_seconds() * 1000) if job.started_at else 0
+            usage_log = UsageLog(
+                user_id=self.user_id,
+                job_id=job_id,
+                campaign_id=campaign_id,
+                agent_type=agent.event_type,
+                provider="bedrock",
+                model_id=None,
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                cost_usd=0.0,
+                credits_charged=actual_cost,
+                duration_ms=duration_ms,
+            )
+            self.db.add(usage_log)
             await self.db.commit()
 
             result["job_id"] = job_id
