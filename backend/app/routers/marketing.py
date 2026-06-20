@@ -304,3 +304,312 @@ async def delete_brand_profile(
         raise HTTPException(status_code=404, detail="Brand profile not found")
     await db.delete(profile)
     await db.commit()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Sprint 3.1C — Content Intelligence Endpoints
+# ══════════════════════════════════════════════════════════════════════════════
+
+from app.services.agents.caption_agent import CaptionAgent
+from app.services.agents.hashtag_agent import HashtagAgent
+from app.services.agents.adcopy_agent import AdCopyAgent
+from app.services.agents.seo_agent import SEOAgent
+from app.services.agents.cta_agent import CTAAgent
+from pydantic import BaseModel as PydanticBaseModel
+
+
+# ── Request schemas (3.1C) ────────────────────────────────────────────────────
+
+class CaptionRequest(PydanticBaseModel):
+    snapshot_id: str | None = None
+    persona_content_id: str | None = None
+    hooks_content_id: str | None = None
+    brand_profile_id: str | None = None
+    research: dict | None = None
+    personas: dict | None = None
+    hooks: dict | None = None
+    campaign_id: str | None = None
+    product_name: str | None = None
+
+class HashtagRequest2(PydanticBaseModel):
+    snapshot_id: str | None = None
+    platform: str = "instagram"
+    industry: str | None = None
+    research: dict | None = None
+    campaign_id: str | None = None
+    product_name: str | None = None
+
+class AdCopyRequest(PydanticBaseModel):
+    snapshot_id: str | None = None
+    persona_content_id: str | None = None
+    hooks_content_id: str | None = None
+    industry: str | None = None
+    research: dict | None = None
+    personas: dict | None = None
+    hooks: dict | None = None
+    campaign_id: str | None = None
+    product_name: str | None = None
+
+class SEORequest(PydanticBaseModel):
+    snapshot_id: str | None = None
+    industry: str | None = None
+    research: dict | None = None
+    campaign_id: str | None = None
+    product_name: str | None = None
+
+class CTARequest(PydanticBaseModel):
+    persona_content_id: str | None = None
+    adcopy_content_id: str | None = None
+    brand_profile_id: str | None = None
+    personas: dict | None = None
+    adcopy: dict | None = None
+    campaign_id: str | None = None
+
+class FullContentBundleRequest(PydanticBaseModel):
+    website_url: str | None = None
+    product_name: str
+    product_description: str | None = None
+    industry: str | None = None
+    brand_profile_id: str | None = None
+    campaign_id: str | None = None
+
+
+# ── Caption endpoint ──────────────────────────────────────────────────────────
+
+@router.post("/captions", summary="Generate platform-specific captions")
+async def run_captions(
+    body: CaptionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = CaptionAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Caption generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "captions": result.get("captions", {})}
+
+
+# ── Hashtag endpoint ──────────────────────────────────────────────────────────
+
+@router.post("/hashtags", summary="Generate categorized hashtags")
+async def run_hashtags(
+    body: HashtagRequest2,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = HashtagAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Hashtag generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "total_hashtags": result.get("total_hashtags", 0), "hashtags": result.get("hashtags", {})}
+
+
+# ── Ad Copy endpoint ──────────────────────────────────────────────────────────
+
+@router.post("/adcopy", summary="Generate multi-framework ad copy")
+async def run_adcopy(
+    body: AdCopyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = AdCopyAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Ad copy generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "adcopy": result.get("adcopy", {})}
+
+
+# ── SEO endpoint ──────────────────────────────────────────────────────────────
+
+@router.post("/seo", summary="Generate SEO content package")
+async def run_seo(
+    body: SEORequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = SEOAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"SEO generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "seo": result.get("seo", {})}
+
+
+# ── CTA endpoint ──────────────────────────────────────────────────────────────
+
+@router.post("/cta", summary="Generate categorized CTAs")
+async def run_cta(
+    body: CTARequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent = CTAAgent(db, current_user.id)
+    runner = AgentRunner(db, current_user.id)
+    try:
+        result = await runner.execute(agent, body.model_dump(), campaign_id=body.campaign_id)
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"CTA generation failed: {exc}")
+    return {"content_id": result["content_id"], "job_id": result["job_id"], "credits_committed": result["credits_committed"], "quality_score": result.get("quality_score"), "total_ctas": result.get("total_ctas", 0), "ctas": result.get("ctas", {})}
+
+
+# ── Full Content Bundle ───────────────────────────────────────────────────────
+
+@router.post("/full-content-bundle", summary="Research → Persona → Hooks → Captions → Hashtags → AdCopy → SEO → CTA")
+async def run_full_content_bundle(
+    body: FullContentBundleRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Sequences all 8 agents. Each step feeds into the next.
+    Total cost: 5+5+5+5+3+8+5+3 = 39 credits (individual pricing).
+    Returns all generated content in one response.
+    """
+    campaign_id = body.campaign_id
+    base = {
+        "website_url": body.website_url,
+        "product_name": body.product_name,
+        "product_description": body.product_description,
+        "industry": body.industry,
+        "brand_profile_id": body.brand_profile_id,
+        "campaign_id": campaign_id,
+    }
+
+    results = {}
+    total_credits = 0
+
+    # Helper to run an agent and accumulate
+    async def _run(agent_cls, payload):
+        nonlocal total_credits
+        agent = agent_cls(db, current_user.id)
+        runner = AgentRunner(db, current_user.id)
+        r = await runner.execute(agent, payload, campaign_id=campaign_id)
+        total_credits += r.get("credits_committed", 0)
+        return r
+
+    try:
+        # 1. Research
+        results["research"] = await _run(MarketResearchAgent, base)
+
+        # 2. Persona
+        results["persona"] = await _run(PersonaAgent, {
+            **base,
+            "snapshot_id": results["research"]["snapshot_id"],
+            "research": results["research"].get("research", {}),
+        })
+
+        # 3. Hooks
+        results["hooks"] = await _run(HookAgent, {
+            **base,
+            "snapshot_id": results["research"]["snapshot_id"],
+            "persona_content_id": results["persona"]["content_id"],
+            "research": results["research"].get("research", {}),
+            "personas": results["persona"].get("personas", {}),
+        })
+
+        # 4. Captions
+        results["captions"] = await _run(CaptionAgent, {
+            **base,
+            "snapshot_id": results["research"]["snapshot_id"],
+            "persona_content_id": results["persona"]["content_id"],
+            "hooks_content_id": results["hooks"]["content_id"],
+            "research": results["research"].get("research", {}),
+            "personas": results["persona"].get("personas", {}),
+            "hooks": results["hooks"].get("hooks", {}),
+        })
+
+        # 5. Hashtags
+        results["hashtags"] = await _run(HashtagAgent, {
+            **base,
+            "snapshot_id": results["research"]["snapshot_id"],
+            "research": results["research"].get("research", {}),
+            "platform": "instagram",
+        })
+
+        # 6. Ad Copy
+        results["adcopy"] = await _run(AdCopyAgent, {
+            **base,
+            "snapshot_id": results["research"]["snapshot_id"],
+            "persona_content_id": results["persona"]["content_id"],
+            "hooks_content_id": results["hooks"]["content_id"],
+            "research": results["research"].get("research", {}),
+            "personas": results["persona"].get("personas", {}),
+            "hooks": results["hooks"].get("hooks", {}),
+        })
+
+        # 7. SEO
+        results["seo"] = await _run(SEOAgent, {
+            **base,
+            "snapshot_id": results["research"]["snapshot_id"],
+            "research": results["research"].get("research", {}),
+        })
+
+        # 8. CTA
+        results["cta"] = await _run(CTAAgent, {
+            **base,
+            "persona_content_id": results["persona"]["content_id"],
+            "adcopy_content_id": results["adcopy"]["content_id"],
+        })
+
+    except CreditReservationError as exc:
+        _credit_error(exc)
+    except Exception as exc:
+        logger.error("full_content_bundle failed at stage: %s", exc)
+        # Return partial results
+        return {
+            "status": "partial",
+            "completed": list(results.keys()),
+            "error": str(exc),
+            "total_credits_committed": total_credits,
+            "results": {k: {"content_id": v.get("content_id"), "quality_score": v.get("quality_score")} for k, v in results.items()},
+        }
+
+    # Emit bundle completion event
+    from app.models.activity import ActivityEvent
+    bundle_event = ActivityEvent(
+        user_id=current_user.id,
+        event="content_bundle_completed",
+        agent="content_bundle_orchestrator",
+        credits_used=total_credits,
+        campaign_id=campaign_id,
+        metadata_json={
+            "agents_completed": list(results.keys()),
+            "total_credits": total_credits,
+            "quality_scores": {k: v.get("quality_score") for k, v in results.items()},
+        },
+    )
+    db.add(bundle_event)
+    await db.commit()
+
+    return {
+        "status": "completed",
+        "total_credits_committed": total_credits,
+        "agents_completed": list(results.keys()),
+        "quality_scores": {k: v.get("quality_score") for k, v in results.items()},
+        "content_ids": {k: v.get("content_id") for k, v in results.items()},
+        "research": results["research"].get("research", {}),
+        "personas": results["persona"].get("personas", {}),
+        "hooks": results["hooks"].get("hooks", {}),
+        "captions": results["captions"].get("captions", {}),
+        "hashtags": results["hashtags"].get("hashtags", {}),
+        "adcopy": results["adcopy"].get("adcopy", {}),
+        "seo": results["seo"].get("seo", {}),
+        "ctas": results["cta"].get("ctas", {}),
+    }

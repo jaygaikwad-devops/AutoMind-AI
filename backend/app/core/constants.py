@@ -10,6 +10,13 @@ AGENT_COSTS = {
     "persona": 5,
     "hook": 5,
     "full_analysis": 15,
+    # Sprint 3.1C agents
+    "caption": 5,
+    "hashtag": 3,
+    "adcopy": 8,
+    "seo": 5,
+    "cta": 3,
+    "full_content_bundle": 34,  # 5+5+5+5+3+8+5+3 = 39 (but bundled at 34)
 }
 
 JOB_STATUS = {

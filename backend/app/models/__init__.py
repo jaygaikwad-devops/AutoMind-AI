@@ -90,3 +90,4 @@ from .asset import Asset
 from .marketing import ResearchSnapshot, BrandProfile, CampaignContent
 from .trend_snapshot import TrendSnapshot
 from .competitor_snapshot import CompetitorSnapshot
+from .cost_tracking import UsageLog
